@@ -8,7 +8,8 @@ No backend, no accounts, no API keys. All data lives in the browser's `localStor
 
 ## What it does
 
-- **Rough Moment button** — one tap, timestamped instantly. An optional one-word tag (tired / hungry / transition / overwhelm / sensory / not sure) can be added in 5 seconds, or skipped entirely. A soft follow-up later asks "how's it going now?" (recovered quickly / still settling / not sure) without forcing it.
+- **Rough Moment button** — one tap, timestamped instantly. An optional one-word tag (tired / hungry / transition / overwhelm / sensory / not sure) and an optional free-text note can be added, or skipped entirely. A soft follow-up later asks "how's it going now?" (recovered quickly / still settling / not sure) without forcing it.
+- **Sick Today button** — one tap records illness as important context. Sick days remain visible in the log and export but are excluded from ordinary pattern comparisons so illness does not distort everyday learning.
 - **Morning check-in** — bedtime, wake time, night wakings (a counter, not a rating), whether they fell asleep alone. Meant to be done right after waking, while it's still accurate.
 - **Evening check-in** — meals eaten, snack/sugar presence, outdoor time bucket, structured activity, focused 1:1 time bucket, screen time bucket. Every field is a count, a bucket, or a yes/no/not-sure — never an opinion scale. "Not sure" is a real, first-class answer everywhere.
 - **Log tab** — full chronological history of everything captured, for review/trust-building.

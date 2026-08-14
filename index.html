@@ -155,6 +155,13 @@
     width:100%; background: var(--surface-raised); border:1px solid var(--line);
     color: var(--text); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:0.92rem;
   }
+  textarea{
+    width:100%; min-height:82px; resize:vertical;
+    background:var(--surface-raised); border:1px solid var(--line);
+    color:var(--text); border-radius:8px; padding:10px 12px;
+    font-family:inherit; font-size:0.92rem; line-height:1.45;
+  }
+  textarea::placeholder{ color:var(--text-faint); }
   .stepper{ display:flex; align-items:center; gap:12px; }
   .stepper button{
     width:36px;height:36px;border-radius:8px;border:1px solid var(--line);
@@ -172,9 +179,11 @@
     background: var(--amber);
   }
   .log-entry.morning::before, .log-entry.evening::before{ background: var(--teal-accent); }
+  .log-entry.sick::before{ background:var(--danger); }
   .log-entry .lt{ font-family:'IBM Plex Mono'; font-size:0.72rem; color: var(--text-faint); }
   .log-entry .ld{ font-size:0.88rem; margin-top:2px; }
   .log-entry .tagline{ color: var(--text-muted); font-size:0.8rem; }
+  .moment-note{ margin-top:5px; color:var(--text); white-space:pre-wrap; line-height:1.4; }
   .empty{ color: var(--text-faint); font-size:0.85rem; text-align:center; padding: 30px 10px; }
 
   /* ---- understanding tab ---- */
@@ -252,6 +261,16 @@
 
     <div id="followupZone"></div>
 
+    <div class="card">
+      <span class="eyebrow">Health context</span>
+      <h3>Sick today?</h3>
+      <p class="desc">One tap keeps illness visible without letting it distort ordinary pattern comparisons.</p>
+      <button class="card-btn" id="sickBtn">
+        <span>Mark sick today</span>
+        <span class="status" id="sickStatus">not marked</span>
+      </button>
+    </div>
+
     <div class="section-title">Today's two check-ins</div>
 
     <div class="card">
@@ -324,6 +343,10 @@
       <div class="chip" data-val="sensory">Sensory</div>
       <div class="chip unsure" data-val="unsure">Not sure</div>
     </div>
+    <label class="field">
+      <span class="flabel">Optional note — write it however it comes out</span>
+      <textarea id="momentNote" maxlength="500" placeholder="Anything you noticed, what happened, what helped…"></textarea>
+    </label>
     <div class="sheet-actions">
       <button class="btn primary" id="momentDone">Done</button>
     </div>

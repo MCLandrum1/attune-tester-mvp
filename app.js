@@ -14,16 +14,17 @@ const MIN_N = 5; // hard floor: never surface a pattern with fewer than this man
 function loadData() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    if (!raw) return { moments: [], mornings: [], evenings: [] };
+    if (!raw) return { moments: [], mornings: [], evenings: [], sickDays: [] };
     const parsed = JSON.parse(raw);
     return {
       moments: Array.isArray(parsed.moments) ? parsed.moments : [],
       mornings: Array.isArray(parsed.mornings) ? parsed.mornings : [],
       evenings: Array.isArray(parsed.evenings) ? parsed.evenings : [],
+      sickDays: Array.isArray(parsed.sickDays) ? parsed.sickDays : [],
     };
   } catch (e) {
     console.error("Attune: failed to load stored data, starting fresh.", e);
-    return { moments: [], mornings: [], evenings: [] };
+    return { moments: [], mornings: [], evenings: [], sickDays: [] };
   }
 }
 
@@ -66,6 +67,14 @@ function fmtDate(d) {
   const dt = new Date(d + "T12:00:00");
   return dt.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
 }
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
 
 // ============================================================
 // NAV
@@ -91,11 +100,12 @@ let pendingMomentId = null;
 let selectedMomentTag = null;
 
 document.getElementById("momentBtn").addEventListener("click", () => {
-  const m = { id: uid(), timestamp: new Date().toISOString(), tag: null, recovery: null };
+  const m = { id: uid(), timestamp: new Date().toISOString(), tag: null, recovery: null, note: "" };
   state.moments.push(m);
   saveData();
   pendingMomentId = m.id;
   selectedMomentTag = null;
+  document.getElementById("momentNote").value = "";
   document.querySelectorAll("#momentChips .chip").forEach((c) => c.classList.remove("selected"));
   document.getElementById("momentTimestamp").textContent = nowTimeLabel() + " · logged instantly";
   document.getElementById("momentOverlay").classList.add("open");
@@ -106,15 +116,22 @@ document.querySelectorAll("#momentChips .chip").forEach((chip) => {
     document.querySelectorAll("#momentChips .chip").forEach((c) => c.classList.remove("selected"));
     chip.classList.add("selected");
     selectedMomentTag = chip.dataset.val;
+    const moment = state.moments.find((x) => x.id === pendingMomentId);
+    if (moment) {
+      moment.tag = selectedMomentTag === "unsure" ? "unknown" : selectedMomentTag;
+      saveData();
+    }
   });
 });
 
+document.getElementById("momentNote").addEventListener("input", (event) => {
+  const moment = state.moments.find((x) => x.id === pendingMomentId);
+  if (!moment) return;
+  moment.note = event.target.value.slice(0, 500);
+  saveData();
+});
+
 document.getElementById("momentDone").addEventListener("click", () => {
-  if (pendingMomentId && selectedMomentTag) {
-    const m = state.moments.find((x) => x.id === pendingMomentId);
-    if (m) m.tag = selectedMomentTag === "unsure" ? "unknown" : selectedMomentTag;
-    saveData();
-  }
   document.getElementById("momentOverlay").classList.remove("open");
   showToast("Captured. That's the hard part done.");
   renderFollowups();
@@ -297,14 +314,32 @@ function renderTodayStatus() {
   const d = todayStr();
   const m = state.mornings.find((x) => x.date === d);
   const e = state.evenings.find((x) => x.date === d);
+  const sick = state.sickDays.find((x) => x.date === d);
   const ms = document.getElementById("morningStatus");
   const es = document.getElementById("eveningStatus");
   ms.textContent = m ? "logged" : "not yet";
   ms.classList.toggle("done", !!m);
   es.textContent = e ? "logged" : "not yet";
   es.classList.toggle("done", !!e);
+  const ss = document.getElementById("sickStatus");
+  ss.textContent = sick ? "logged · tap to undo" : "not marked";
+  ss.classList.toggle("done", !!sick);
   renderFollowups();
 }
+
+document.getElementById("sickBtn").addEventListener("click", () => {
+  const date = todayStr();
+  const index = state.sickDays.findIndex((x) => x.date === date);
+  if (index >= 0) {
+    state.sickDays.splice(index, 1);
+    showToast("Sick-day marker removed.");
+  } else {
+    state.sickDays.push({ id: uid(), date, loggedAt: new Date().toISOString() });
+    showToast("Sick day logged.");
+  }
+  saveData();
+  renderTodayStatus();
+});
 
 // ============================================================
 // LOG TAB
@@ -320,6 +355,9 @@ function renderLog() {
   );
   state.evenings.forEach((e) =>
     items.push({ type: "evening", t: e.loggedAt || e.date, node: eveningNode(e) })
+  );
+  state.sickDays.forEach((s) =>
+    items.push({ type: "sick", t: s.loggedAt || s.date, node: sickNode(s) })
   );
   items.sort((a, b) => new Date(b.t) - new Date(a.t));
 
@@ -347,7 +385,7 @@ function momentNode(m) {
   div.innerHTML = `
     <div class="lt">${new Date(m.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
     <div class="ld">Rough moment</div>
-    <div class="tagline">${tagLabel(m.tag)}${rec ? " · " + rec : ""}</div>
+    <div class="tagline">${tagLabel(m.tag)}${rec ? " · " + rec : ""}${m.note ? `<div class="moment-note">${escapeHtml(m.note)}</div>` : ""}</div>
   `;
   return div;
 }
@@ -370,6 +408,16 @@ function eveningNode(e) {
     <div class="lt">${fmtDate(e.date)} · evening</div>
     <div class="ld">Day logged</div>
     <div class="tagline">${meals} · outdoor: ${e.outdoorTime} · focus time: ${e.focusedTime}</div>
+  `;
+  return div;
+}
+function sickNode(s) {
+  const div = document.createElement("div");
+  div.className = "log-entry sick";
+  div.innerHTML = `
+    <div class="lt">${fmtDate(s.date)} · health context</div>
+    <div class="ld">Sick day</div>
+    <div class="tagline">Kept in the log and excluded from ordinary pattern comparisons.</div>
   `;
   return div;
 }
@@ -429,7 +477,8 @@ function buildDayRecords() {
     if (e.structuredActivity && e.structuredActivity !== "unsure") rec.factors["structured_activity"] = e.structuredActivity;
     if (e.meals) rec.factors["all_meals_eaten"] = e.meals.length >= 3 ? "yes" : "no";
   });
-  return Object.values(byDate);
+  const sickDates = new Set(state.sickDays.map((entry) => entry.date));
+  return Object.values(byDate).filter((day) => !sickDates.has(day.date));
 }
 
 // ============================================================
