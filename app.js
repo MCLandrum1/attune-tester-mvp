@@ -105,7 +105,6 @@ document.getElementById("momentBtn").addEventListener("click", () => {
   saveData();
   pendingMomentId = m.id;
   selectedMomentTag = null;
-  document.getElementById("momentNote").value = "";
   document.querySelectorAll("#momentChips .chip").forEach((c) => c.classList.remove("selected"));
   document.getElementById("momentTimestamp").textContent = nowTimeLabel() + " · logged instantly";
   document.getElementById("momentOverlay").classList.add("open");
@@ -122,13 +121,6 @@ document.querySelectorAll("#momentChips .chip").forEach((chip) => {
       saveData();
     }
   });
-});
-
-document.getElementById("momentNote").addEventListener("input", (event) => {
-  const moment = state.moments.find((x) => x.id === pendingMomentId);
-  if (!moment) return;
-  moment.note = event.target.value.slice(0, 500);
-  saveData();
 });
 
 document.getElementById("momentDone").addEventListener("click", () => {
@@ -253,6 +245,7 @@ document.getElementById("openEvening").addEventListener("click", () => {
   document.getElementById("f_outdoor").value = existing ? existing.outdoorTime : "unsure";
   document.getElementById("f_focus").value = existing ? existing.focusedTime : "unsure";
   document.getElementById("f_screen").value = existing ? existing.screenTime : "unsure";
+  document.getElementById("f_eveningNote").value = existing ? existing.note || "" : "";
   updateMealsChips();
   updateSnackChips();
   updateStructChips();
@@ -296,6 +289,7 @@ document.getElementById("eveningSave").addEventListener("click", () => {
     structuredActivity: selectedStruct,
     focusedTime: document.getElementById("f_focus").value,
     screenTime: document.getElementById("f_screen").value,
+    note: document.getElementById("f_eveningNote").value.trim().slice(0, 1000),
     loggedAt: new Date().toISOString(),
   };
   const idx = state.evenings.findIndex((e) => e.date === date);
@@ -414,7 +408,7 @@ function eveningNode(e) {
   div.innerHTML = `
     <div class="lt">${fmtDate(e.date)} · evening</div>
     <div class="ld">Day logged</div>
-    <div class="tagline">${meals} · outdoor: ${e.outdoorTime} · focus time: ${e.focusedTime}</div>
+    <div class="tagline">${meals} · outdoor: ${e.outdoorTime} · focus time: ${e.focusedTime}${e.note ? `<div class="moment-note">${escapeHtml(e.note)}</div>` : ""}</div>
   `;
   return div;
 }

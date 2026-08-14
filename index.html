@@ -347,10 +347,6 @@
       <div class="chip" data-val="sensory">Sensory</div>
       <div class="chip unsure" data-val="unsure">Not sure</div>
     </div>
-    <label class="field">
-      <span class="flabel">Optional note — write it however it comes out</span>
-      <textarea id="momentNote" maxlength="500" placeholder="Anything you noticed, what happened, what helped…"></textarea>
-    </label>
     <div class="sheet-actions">
       <button class="btn primary" id="momentDone">Done</button>
     </div>
@@ -443,6 +439,10 @@
         <option value="alot">A lot</option>
       </select>
     </label>
+    <label class="field">
+      <span class="flabel">Optional notes — write the day however it comes out</span>
+      <textarea id="f_eveningNote" maxlength="1000" placeholder="Moments you noticed, what happened, what helped…"></textarea>
+    </label>
     <div class="sheet-actions">
       <button class="btn ghost" id="eveningCancel">Cancel</button>
       <button class="btn primary" id="eveningSave">Save</button>
@@ -452,6 +452,6 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
