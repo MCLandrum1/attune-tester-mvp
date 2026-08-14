@@ -386,7 +386,14 @@ function momentNode(m) {
     <div class="lt">${new Date(m.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
     <div class="ld">Rough moment</div>
     <div class="tagline">${tagLabel(m.tag)}${rec ? " · " + rec : ""}${m.note ? `<div class="moment-note">${escapeHtml(m.note)}</div>` : ""}</div>
+    <button class="entry-remove" type="button">Remove</button>
   `;
+  div.querySelector(".entry-remove").addEventListener("click", () => {
+    state.moments = state.moments.filter((item) => item.id !== m.id);
+    saveData();
+    renderLog();
+    showToast("Moment removed.");
+  });
   return div;
 }
 function morningNode(m) {
@@ -418,7 +425,14 @@ function sickNode(s) {
     <div class="lt">${fmtDate(s.date)} · health context</div>
     <div class="ld">Sick day</div>
     <div class="tagline">Kept in the log and excluded from ordinary pattern comparisons.</div>
+    <button class="entry-remove" type="button">Remove</button>
   `;
+  div.querySelector(".entry-remove").addEventListener("click", () => {
+    state.sickDays = state.sickDays.filter((item) => item.id !== s.id);
+    saveData();
+    renderLog();
+    showToast("Sick-day marker removed.");
+  });
   return div;
 }
 
