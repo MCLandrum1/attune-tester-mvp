@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attune — notice what matters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Work+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #12201F;
+    --bg-deep: #0C1615;
+    --surface: #1B2B29;
+    --surface-raised: #223635;
+    --line: #2E4441;
+    --text: #F3EFE6;
+    --text-muted: #93A6A2;
+    --text-faint: #647672;
+    --amber: #E3A85B;
+    --amber-dim: #7A5A32;
+    --teal-accent: #6FA8A0;
+    --danger: #C97164;
+    --radius: 14px;
+    --shadow-lamp: 0 0 60px 10px rgba(227,168,91,0.12);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background: radial-gradient(ellipse at top, #172624 0%, var(--bg) 45%, var(--bg-deep) 100%);
+    color: var(--text);
+    font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3,.serif{ font-family:'Fraunces', Georgia, serif; font-weight:500; letter-spacing:-0.01em; }
+  .mono{ font-family:'IBM Plex Mono', monospace; }
+  .app{
+    max-width: 480px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 28px 20px 110px;
+    position: relative;
+  }
+  header.top{
+    display:flex; align-items:baseline; justify-content:space-between;
+    margin-bottom: 22px;
+  }
+  header.top .brand{ font-size: 1.5rem; }
+  header.top .brand span{ color: var(--amber); }
+  header.top .date{ color: var(--text-faint); font-size: 0.8rem; }
+
+  .tab-panel{ display:none; animation: fade .25s ease; }
+  .tab-panel.active{ display:block; }
+  @keyframes fade{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+  /* ---- Signature element: the moment button ---- */
+  .moment-wrap{
+    display:flex; flex-direction:column; align-items:center;
+    padding: 18px 0 26px;
+  }
+  .moment-btn{
+    width: 190px; height: 190px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #F4C583, var(--amber) 55%, #B87F35 100%);
+    border: none;
+    box-shadow: var(--shadow-lamp), inset 0 -8px 20px rgba(0,0,0,0.25), inset 0 6px 14px rgba(255,255,255,0.25);
+    color: #2A1B08;
+    font-family:'Fraunces', serif;
+    font-size: 1.25rem;
+    cursor: pointer;
+    position: relative;
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .moment-btn:active{ transform: scale(0.96); }
+  .moment-btn .sub{ display:block; font-family:'Work Sans'; font-size:0.72rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; opacity:0.65; margin-top:4px; }
+  .moment-caption{ color: var(--text-muted); font-size: 0.85rem; margin-top: 16px; text-align:center; max-width: 280px; line-height:1.5; }
+
+  .pulse-ring{
+    position:absolute; inset:-14px; border-radius:50%;
+    border: 1px solid rgba(227,168,91,0.35);
+    animation: pulse 2.6s ease-out infinite;
+    pointer-events:none;
+  }
+  @keyframes pulse{ 0%{ transform:scale(0.92); opacity:0.9;} 100%{ transform:scale(1.18); opacity:0;} }
+  @media (prefers-reduced-motion: reduce){ .pulse-ring{ animation:none; } .moment-btn{ transition:none; } }
+
+  /* ---- Cards ---- */
+  .card{
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px 18px;
+    margin-bottom: 14px;
+  }
+  .card h3{ margin:0 0 4px; font-size:1.05rem; }
+  .card .eyebrow{ text-transform:uppercase; letter-spacing:0.08em; font-size:0.68rem; color: var(--teal-accent); font-family:'IBM Plex Mono'; margin-bottom:6px; display:block; }
+  .card p.desc{ color: var(--text-muted); font-size:0.85rem; margin: 4px 0 12px; line-height:1.5;}
+  .card-btn{
+    width:100%; text-align:left;
+    background: var(--surface-raised);
+    border:1px solid var(--line);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 13px 14px;
+    font-family: inherit; font-size:0.92rem;
+    display:flex; justify-content:space-between; align-items:center;
+    cursor:pointer;
+  }
+  .card-btn .status{ font-size:0.75rem; color: var(--text-faint); }
+  .card-btn .status.done{ color: var(--teal-accent); }
+
+  /* ---- chips ---- */
+  .chip-row{ display:flex; flex-wrap:wrap; gap:8px; margin: 10px 0; }
+  .chip{
+    background: var(--surface-raised);
+    border:1px solid var(--line);
+    color: var(--text);
+    padding: 9px 14px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    cursor:pointer;
+  }
+  .chip.selected{ background: var(--amber); border-color: var(--amber); color:#2A1B08; font-weight:600; }
+  .chip.unsure{ border-style: dashed; color: var(--text-muted); }
+
+  /* ---- overlay / sheet ---- */
+  .overlay{
+    position:fixed; inset:0; background: rgba(6,12,11,0.72);
+    display:none; align-items:flex-end; justify-content:center; z-index:50;
+  }
+  .overlay.open{ display:flex; }
+  .sheet{
+    background: var(--surface); border:1px solid var(--line);
+    border-radius: 20px 20px 0 0;
+    width:100%; max-width:480px;
+    padding: 22px 20px 30px;
+    animation: slideup .22s ease;
+  }
+  @keyframes slideup{ from{ transform:translateY(30px); opacity:0.4 } to{ transform:translateY(0); opacity:1 } }
+  .sheet h3{ margin:0 0 2px; }
+  .sheet .timestamp{ color: var(--text-faint); font-size:0.78rem; margin-bottom:16px; }
+  .sheet-actions{ display:flex; gap:10px; margin-top:18px; }
+  .btn{
+    flex:1; padding:12px 14px; border-radius:10px; border:1px solid var(--line);
+    background: var(--surface-raised); color:var(--text); font-family:inherit; font-size:0.9rem; cursor:pointer;
+  }
+  .btn.primary{ background: var(--amber); color:#2A1B08; border-color:var(--amber); font-weight:600; }
+  .btn.ghost{ background:transparent; }
+
+  /* ---- form fields ---- */
+  label.field{ display:block; margin-bottom:14px; }
+  label.field .flabel{ display:block; font-size:0.82rem; color: var(--text-muted); margin-bottom:6px; }
+  input[type=time], select{
+    width:100%; background: var(--surface-raised); border:1px solid var(--line);
+    color: var(--text); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:0.92rem;
+  }
+  .stepper{ display:flex; align-items:center; gap:12px; }
+  .stepper button{
+    width:36px;height:36px;border-radius:8px;border:1px solid var(--line);
+    background:var(--surface-raised); color:var(--text); font-size:1.1rem; cursor:pointer;
+  }
+  .stepper .val{ min-width: 28px; text-align:center; font-family:'IBM Plex Mono'; }
+
+  /* ---- log list ---- */
+  .log-entry{
+    border-left: 2px solid var(--line);
+    padding: 4px 0 14px 14px; margin-left:4px; position:relative;
+  }
+  .log-entry::before{
+    content:''; position:absolute; left:-5px; top:6px; width:8px; height:8px; border-radius:50%;
+    background: var(--amber);
+  }
+  .log-entry.morning::before, .log-entry.evening::before{ background: var(--teal-accent); }
+  .log-entry .lt{ font-family:'IBM Plex Mono'; font-size:0.72rem; color: var(--text-faint); }
+  .log-entry .ld{ font-size:0.88rem; margin-top:2px; }
+  .log-entry .tagline{ color: var(--text-muted); font-size:0.8rem; }
+  .empty{ color: var(--text-faint); font-size:0.85rem; text-align:center; padding: 30px 10px; }
+
+  /* ---- understanding tab ---- */
+  .theory-card{
+    background: linear-gradient(160deg, var(--surface-raised), var(--surface));
+    border:1px solid var(--amber-dim);
+  }
+  .confidence-tag{
+    display:inline-block; font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em;
+    padding:3px 9px; border-radius:999px; font-family:'IBM Plex Mono';
+    background: rgba(227,168,91,0.15); color: var(--amber); border:1px solid var(--amber-dim);
+    margin-bottom: 10px;
+  }
+  .theory-line{ font-size:1.02rem; line-height:1.55; margin: 6px 0 14px; }
+  .evidence-line{ font-size:0.82rem; color: var(--text-muted); margin-bottom: 14px; }
+  .try-box{
+    background: rgba(111,168,160,0.1); border:1px solid var(--teal-accent);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 10px;
+  }
+  .try-box .lbl{ font-size:0.68rem; text-transform:uppercase; color:var(--teal-accent); letter-spacing:0.06em; font-family:'IBM Plex Mono'; display:block; margin-bottom:4px;}
+
+  /* ---- bottom nav ---- */
+  nav.bottom{
+    position:fixed; bottom:0; left:0; right:0;
+    background: rgba(18,32,31,0.92); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--line);
+    display:flex; justify-content:center;
+    z-index: 40;
+  }
+  nav.bottom .inner{ display:flex; width:100%; max-width:480px; }
+  nav.bottom button{
+    flex:1; background:none; border:none; color: var(--text-faint);
+    padding: 13px 0 10px; font-family:'Work Sans'; font-size:0.72rem; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  nav.bottom button.active{ color: var(--amber); }
+  nav.bottom svg{ width:20px; height:20px; }
+
+  .toast{
+    position:fixed; top:20px; left:50%; transform:translateX(-50%);
+    background: var(--surface-raised); border:1px solid var(--teal-accent);
+    color: var(--text); padding:10px 18px; border-radius:999px; font-size:0.85rem;
+    z-index:60; opacity:0; pointer-events:none; transition: opacity .2s ease, transform .2s ease;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(6px); }
+
+  .section-title{ font-size:0.72rem; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); margin: 22px 0 10px 2px; }
+  .followup{
+    background: var(--surface-raised); border:1px dashed var(--amber-dim);
+    border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size:0.85rem;
+  }
+  .followup .chip-row{ margin-top:8px; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header class="top">
+    <div class="brand serif">Att<span>u</span>ne</div>
+    <div class="date mono" id="todayDate"></div>
+  </header>
+
+  <!-- ================= TODAY TAB ================= -->
+  <section class="tab-panel active" id="tab-today">
+
+    <div class="moment-wrap">
+      <button class="moment-btn" id="momentBtn">
+        <div class="pulse-ring"></div>
+        Rough<br>Moment
+        <span class="sub">tap now</span>
+      </button>
+      <p class="moment-caption">One tap, right when it happens. That's the most reliable data in the whole app — nothing to remember later.</p>
+    </div>
+
+    <div id="followupZone"></div>
+
+    <div class="section-title">Today's two check-ins</div>
+
+    <div class="card">
+      <span class="eyebrow">This morning</span>
+      <h3>Sleep &amp; waking</h3>
+      <p class="desc">Best done right after they wake up, while it's fresh — not tonight.</p>
+      <button class="card-btn" id="openMorning">
+        <span>Log this morning</span>
+        <span class="status" id="morningStatus">not yet</span>
+      </button>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Evening wrap-up</span>
+      <h3>Meals, movement, connection</h3>
+      <p class="desc">Quick counts, not opinions — takes about 20 seconds.</p>
+      <button class="card-btn" id="openEvening">
+        <span>Log today</span>
+        <span class="status" id="eveningStatus">not yet</span>
+      </button>
+    </div>
+
+  </section>
+
+  <!-- ================= LOG TAB ================= -->
+  <section class="tab-panel" id="tab-log">
+    <h2 class="serif">Log</h2>
+    <p class="desc" style="color:var(--text-muted); margin-top:-6px;">Everything captured, newest first.</p>
+    <div id="logList"></div>
+    <button class="btn ghost" id="exportBtn" style="margin-top:10px;">Export data as JSON</button>
+  </section>
+
+  <!-- ================= UNDERSTANDING TAB ================= -->
+  <section class="tab-panel" id="tab-understand">
+    <h2 class="serif">Understanding</h2>
+    <div id="understandZone"></div>
+  </section>
+
+</div>
+
+<nav class="bottom">
+  <div class="inner">
+    <button class="nav-btn active" data-tab="today">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>
+      Today
+    </button>
+    <button class="nav-btn" data-tab="log">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      Log
+    </button>
+    <button class="nav-btn" data-tab="understand">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3a6 6 0 00-3 11.2V17h6v-2.8A6 6 0 0012 3z"/><path d="M10 20h4"/></svg>
+      Understanding
+    </button>
+  </div>
+</nav>
+
+<!-- Sheets / overlays -->
+<div class="overlay" id="momentOverlay">
+  <div class="sheet">
+    <span class="eyebrow">Just now</span>
+    <h3 class="serif">Rough moment logged</h3>
+    <div class="timestamp mono" id="momentTimestamp"></div>
+    <p class="desc" style="margin-bottom:6px;">If you have five seconds — what was it near?</p>
+    <div class="chip-row" id="momentChips">
+      <div class="chip" data-val="tired">Tired</div>
+      <div class="chip" data-val="hungry">Hungry</div>
+      <div class="chip" data-val="transition">Transition</div>
+      <div class="chip" data-val="overwhelmed">Overwhelm</div>
+      <div class="chip" data-val="sensory">Sensory</div>
+      <div class="chip unsure" data-val="unsure">Not sure</div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn primary" id="momentDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="morningOverlay">
+  <div class="sheet">
+    <span class="eyebrow">This morning</span>
+    <h3 class="serif">Sleep &amp; waking</h3>
+    <label class="field"><span class="flabel">Bedtime</span><input type="time" id="f_bedtime"></label>
+    <label class="field"><span class="flabel">Wake time</span><input type="time" id="f_waketime"></label>
+    <label class="field">
+      <span class="flabel">Night wakings</span>
+      <div class="stepper">
+        <button type="button" id="wakeMinus">–</button>
+        <span class="val mono" id="wakeVal">?</span>
+        <button type="button" id="wakePlus">+</button>
+      </div>
+    </label>
+    <label class="field">
+      <span class="flabel">Fell asleep alone?</span>
+      <div class="chip-row" id="aloneChips">
+        <div class="chip" data-val="yes">Yes</div>
+        <div class="chip" data-val="no">No</div>
+        <div class="chip unsure" data-val="unsure">Not sure</div>
+      </div>
+    </label>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="morningCancel">Cancel</button>
+      <button class="btn primary" id="morningSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="eveningOverlay">
+  <div class="sheet" style="max-height:82vh; overflow-y:auto;">
+    <span class="eyebrow">Today</span>
+    <h3 class="serif">Meals, movement, connection</h3>
+    <label class="field">
+      <span class="flabel">Meals eaten</span>
+      <div class="chip-row" id="mealsChips">
+        <div class="chip" data-val="breakfast">Breakfast</div>
+        <div class="chip" data-val="lunch">Lunch</div>
+        <div class="chip" data-val="dinner">Dinner</div>
+      </div>
+    </label>
+    <label class="field">
+      <span class="flabel">Sugary or processed snack today?</span>
+      <div class="chip-row" id="snackChips">
+        <div class="chip" data-val="yes">Yes</div>
+        <div class="chip" data-val="no">No</div>
+        <div class="chip unsure" data-val="unsure">Not sure</div>
+      </div>
+    </label>
+    <label class="field">
+      <span class="flabel">Outdoor time today</span>
+      <select id="f_outdoor">
+        <option value="unsure" selected>Not sure</option>
+        <option value="none">None</option>
+        <option value="under30">Under 30 min</option>
+        <option value="30to60">30–60 min</option>
+        <option value="over60">Over 60 min</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="flabel">Structured activity (sport, class, playground)?</span>
+      <div class="chip-row" id="structChips">
+        <div class="chip" data-val="yes">Yes</div>
+        <div class="chip" data-val="no">No</div>
+        <div class="chip unsure" data-val="unsure">Not sure</div>
+      </div>
+    </label>
+    <label class="field">
+      <span class="flabel">Focused 1:1 time with a parent</span>
+      <select id="f_focus">
+        <option value="unsure" selected>Not sure</option>
+        <option value="none">None</option>
+        <option value="under15">Under 15 min</option>
+        <option value="15to45">15–45 min</option>
+        <option value="over45">Over 45 min</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="flabel">Screen time today</span>
+      <select id="f_screen">
+        <option value="unsure" selected>Not sure</option>
+        <option value="none">None</option>
+        <option value="some">Some</option>
+        <option value="alot">A lot</option>
+      </select>
+    </label>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="eveningCancel">Cancel</button>
+      <button class="btn primary" id="eveningSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
