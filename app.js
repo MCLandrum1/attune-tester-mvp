@@ -31,6 +31,7 @@ function loadData() {
 function saveData() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    queueCloudSave();
   } catch (e) {
     console.error("Attune: failed to save data.", e);
     showToast("Couldn't save — storage may be full or disabled.");
@@ -38,6 +39,95 @@ function saveData() {
 }
 
 let state = loadData();
+let cloudClient = null;
+let cloudUser = null;
+let cloudSaveTimer = null;
+let applyingCloudState = false;
+
+function setCloudStatus(label, signedIn = false) {
+  const status = document.getElementById("cloudStatus");
+  const button = document.getElementById("cloudButton");
+  status.textContent = label;
+  status.classList.toggle("done", signedIn);
+  button.textContent = signedIn ? "Sign out" : "Sign in";
+}
+
+function queueCloudSave() {
+  if (!cloudClient || !cloudUser || applyingCloudState) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSaveTimer = setTimeout(saveCloudState, 350);
+}
+
+async function saveCloudState() {
+  if (!cloudClient || !cloudUser) return;
+  setCloudStatus("saving…", true);
+  const { error } = await cloudClient.from("attune_tester_state").upsert({
+    user_id: cloudUser.id,
+    data: state,
+    updated_at: new Date().toISOString(),
+  });
+  if (error) {
+    console.error("Attune: cloud save failed.", error);
+    setCloudStatus("saved on this device", true);
+    showToast("Saved on this device; cloud sync will retry.");
+    return;
+  }
+  setCloudStatus("synced", true);
+}
+
+async function loadCloudState() {
+  if (!cloudClient || !cloudUser) return;
+  setCloudStatus("syncing…", true);
+  const { data, error } = await cloudClient
+    .from("attune_tester_state")
+    .select("data")
+    .eq("user_id", cloudUser.id)
+    .maybeSingle();
+  if (error) {
+    console.error("Attune: cloud load failed.", error);
+    setCloudStatus("saved on this device", true);
+    return;
+  }
+  if (data && data.data) {
+    applyingCloudState = true;
+    const incoming = data.data;
+    state = {
+      moments: Array.isArray(incoming.moments) ? incoming.moments : [],
+      mornings: Array.isArray(incoming.mornings) ? incoming.mornings : [],
+      evenings: Array.isArray(incoming.evenings) ? incoming.evenings : [],
+      sickDays: Array.isArray(incoming.sickDays) ? incoming.sickDays : [],
+    };
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    applyingCloudState = false;
+    renderTodayStatus();
+  } else {
+    await saveCloudState();
+  }
+  setCloudStatus("synced", true);
+}
+
+async function initCloud() {
+  try {
+    const response = await fetch("/api/config", { cache: "no-store" });
+    if (!response.ok || !window.supabase) return;
+    const config = await response.json();
+    if (!config.configured) return;
+    cloudClient = window.supabase.createClient(config.supabaseUrl, config.supabasePublishableKey);
+    const { data } = await cloudClient.auth.getSession();
+    cloudUser = data.session?.user || null;
+    if (cloudUser) await loadCloudState();
+    else setCloudStatus("device only");
+    cloudClient.auth.onAuthStateChange((_event, session) => {
+      const nextUser = session?.user || null;
+      const changed = nextUser?.id !== cloudUser?.id;
+      cloudUser = nextUser;
+      if (cloudUser && changed) setTimeout(loadCloudState, 0);
+      if (!cloudUser) setCloudStatus("device only");
+    });
+  } catch (error) {
+    console.warn("Attune: cloud sync unavailable; continuing on this device.", error);
+  }
+}
 
 // ---------- helpers ----------
 function todayStr() {
@@ -92,6 +182,50 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
 });
 
 document.getElementById("todayDate").textContent = fmtDate(todayStr());
+
+document.getElementById("cloudButton").addEventListener("click", async () => {
+  if (!cloudClient) {
+    showToast("Cloud sync is not configured yet.");
+    return;
+  }
+  if (cloudUser) {
+    await cloudClient.auth.signOut();
+    cloudUser = null;
+    setCloudStatus("device only");
+    showToast("Signed out. New entries still save on this device.");
+    return;
+  }
+  document.getElementById("authOverlay").classList.add("open");
+  document.getElementById("authEmail").focus();
+});
+
+document.getElementById("authCancel").addEventListener("click", () => {
+  document.getElementById("authOverlay").classList.remove("open");
+});
+
+document.getElementById("authSend").addEventListener("click", async () => {
+  const email = document.getElementById("authEmail").value.trim();
+  if (!email || !email.includes("@")) {
+    showToast("Enter a valid email address.");
+    return;
+  }
+  const button = document.getElementById("authSend");
+  button.disabled = true;
+  button.textContent = "Sending…";
+  const { error } = await cloudClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin },
+  });
+  button.disabled = false;
+  button.textContent = "Email me a sign-in link";
+  if (error) {
+    console.error("Attune: sign-in link failed.", error);
+    showToast("Couldn't send the sign-in link. Try again.");
+    return;
+  }
+  document.getElementById("authOverlay").classList.remove("open");
+  showToast("Check your email for the Attune sign-in link.");
+});
 
 // ============================================================
 // ROUGH MOMENT — one-tap real-time capture
@@ -619,3 +753,4 @@ function renderUnderstanding() {
 // INIT
 // ============================================================
 renderTodayStatus();
+initCloud();

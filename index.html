@@ -49,6 +49,8 @@
   header.top .brand{ font-size: 1.5rem; }
   header.top .brand span{ color: var(--amber); }
   header.top .date{ color: var(--text-faint); font-size: 0.8rem; }
+  .cloud-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-8px 0 14px;color:var(--text-faint);font-size:0.76rem;}
+  .cloud-action{border:0;background:none;color:var(--teal-accent);font:inherit;text-decoration:underline;cursor:pointer;padding:4px;}
 
   .tab-panel{ display:none; animation: fade .25s ease; }
   .tab-panel.active{ display:block; }
@@ -155,6 +157,7 @@
     width:100%; background: var(--surface-raised); border:1px solid var(--line);
     color: var(--text); border-radius:8px; padding:10px 12px; font-family:inherit; font-size:0.92rem;
   }
+  input[type=email]{width:100%;background:var(--surface-raised);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:11px 12px;font:inherit;}
   textarea{
     width:100%; min-height:82px; resize:vertical;
     background:var(--surface-raised); border:1px solid var(--line);
@@ -250,6 +253,10 @@
     <div class="brand serif">Att<span>u</span>ne</div>
     <div class="date mono" id="todayDate"></div>
   </header>
+  <div class="cloud-bar">
+    <span>Cloud: <span id="cloudStatus">checking…</span></span>
+    <button class="cloud-action" id="cloudButton" type="button">Sign in</button>
+  </div>
 
   <!-- ================= TODAY TAB ================= -->
   <section class="tab-panel active" id="tab-today">
@@ -353,6 +360,22 @@
   </div>
 </div>
 
+<div class="overlay" id="authOverlay">
+  <div class="sheet">
+    <span class="eyebrow">Private cloud sync</span>
+    <h3 class="serif">Use Attune on another device</h3>
+    <p class="desc">Enter your email and we'll send a secure sign-in link. No password needed.</p>
+    <label class="field">
+      <span class="flabel">Email address</span>
+      <input type="email" id="authEmail" autocomplete="email" inputmode="email" placeholder="you@example.com">
+    </label>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="authCancel">Cancel</button>
+      <button class="btn primary" id="authSend">Email me a sign-in link</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="morningOverlay">
   <div class="sheet">
     <span class="eyebrow">This morning</span>
@@ -452,6 +475,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

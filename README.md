@@ -4,7 +4,7 @@ A standalone prototype focused on one problem: **can we get honest, low-burden, 
 
 This is not wired into your production Attune codebase (learning loop, working theory engine, Child Playbook, etc.). It's a clean, self-contained app built to test the *logging experience* itself with real families before investing more in the full architecture.
 
-No backend, no accounts, no API keys. All data lives in the browser's `localStorage` on each tester's device. That's the right tradeoff for a fast test — it is **not** appropriate for a real multi-device or multi-parent-household launch (see "Known limitations" below).
+The app is local-first: every action saves immediately in the browser. When deployed with its Supabase and Vercel configuration, a parent can sign in by email magic link and privately sync that state across devices. Row Level Security restricts each account to its own tester state.
 
 ## What it does
 

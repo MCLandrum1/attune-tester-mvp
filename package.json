@@ -1,0 +1,9 @@
+{
+  "name": "attune-tester-mvp",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "dev": "vercel dev"
+  }
+}
+
