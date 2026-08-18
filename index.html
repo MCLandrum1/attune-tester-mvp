@@ -272,6 +272,8 @@
 
     <div id="followupZone"></div>
 
+    <button class="btn ghost" id="manualReview" type="button" style="margin-bottom:14px;">Look back at recent moments</button>
+
     <div class="card">
       <span class="eyebrow">Health context</span>
       <h3>Sick today?</h3>
@@ -350,12 +352,45 @@
       <div class="chip" data-val="tired">Tired</div>
       <div class="chip" data-val="hungry">Hungry</div>
       <div class="chip" data-val="transition">Transition</div>
-      <div class="chip" data-val="overwhelmed">Overwhelm</div>
-      <div class="chip" data-val="sensory">Sensory</div>
+      <div class="chip" data-val="limit_set">Told no / limits</div>
+      <div class="chip" data-val="overwhelmed">Too much going on</div>
+      <div class="chip" data-val="social">Sibling / social</div>
       <div class="chip unsure" data-val="unsure">Not sure</div>
     </div>
     <div class="sheet-actions">
       <button class="btn primary" id="momentDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="reviewOverlay">
+  <div class="sheet">
+    <span class="eyebrow">A calm look back</span>
+    <h3 class="serif">Did anything help?</h3>
+    <p class="desc" id="reviewMomentLabel"></p>
+    <label class="field">
+      <span class="flabel">What did you try?</span>
+      <div class="chip-row" id="triedChips">
+        <div class="chip" data-val="movement">Movement / outside</div>
+        <div class="chip" data-val="snack">Snack</div>
+        <div class="chip" data-val="quiet_space">Quiet space</div>
+        <div class="chip" data-val="connection">Cuddle / connection</div>
+        <div class="chip" data-val="something_else">Something else</div>
+        <div class="chip unsure" data-val="nothing">Nothing</div>
+      </div>
+    </label>
+    <label class="field" id="helpedField" style="display:none;">
+      <span class="flabel">Did it seem to help?</span>
+      <div class="chip-row" id="helpedChips">
+        <div class="chip" data-val="yes_clearly">Yes, clearly</div>
+        <div class="chip" data-val="a_little">A little</div>
+        <div class="chip" data-val="not_really">Not really</div>
+        <div class="chip unsure" data-val="not_sure">Not sure</div>
+      </div>
+    </label>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="reviewSkip">Skip</button>
+      <button class="btn primary" id="reviewNext">Save &amp; next</button>
     </div>
   </div>
 </div>
@@ -476,6 +511,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

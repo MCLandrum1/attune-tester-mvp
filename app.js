@@ -227,6 +227,8 @@ document.getElementById("authSend").addEventListener("click", async () => {
   showToast("Check your email for the Attune sign-in link.");
 });
 
+document.getElementById("manualReview").addEventListener("click", () => startMomentReview());
+
 // ============================================================
 // ROUGH MOMENT — one-tap real-time capture
 // ============================================================
@@ -234,7 +236,15 @@ let pendingMomentId = null;
 let selectedMomentTag = null;
 
 document.getElementById("momentBtn").addEventListener("click", () => {
-  const m = { id: uid(), timestamp: new Date().toISOString(), tag: null, recovery: null, note: "" };
+  const m = {
+    id: uid(),
+    timestamp: new Date().toISOString(),
+    tag: null,
+    recovery: null,
+    note: "",
+    supportTried: null,
+    supportHelped: null,
+  };
   state.moments.push(m);
   saveData();
   pendingMomentId = m.id;
@@ -433,7 +443,77 @@ document.getElementById("eveningSave").addEventListener("click", () => {
   document.getElementById("eveningOverlay").classList.remove("open");
   showToast("Today saved.");
   renderTodayStatus();
+  startMomentReview();
 });
+
+// ============================================================
+// MOMENT RETROSPECTIVE — support effectiveness is collected later,
+// never while a parent is handling the rough moment itself.
+// ============================================================
+let reviewQueue = [];
+let reviewIdx = 0;
+let reviewSelectedTried = null;
+let reviewSelectedHelped = null;
+
+function startMomentReview() {
+  const cutoff = Date.now() - 36 * 60 * 60 * 1000;
+  reviewQueue = state.moments
+    .filter((m) => m.supportTried == null && new Date(m.timestamp).getTime() > cutoff)
+    .slice(-2);
+  reviewIdx = 0;
+  if (reviewQueue.length) showReviewStep();
+  else showToast("No recent moments need a look back.");
+}
+
+function showReviewStep() {
+  if (reviewIdx >= reviewQueue.length) {
+    document.getElementById("reviewOverlay").classList.remove("open");
+    return;
+  }
+  reviewSelectedTried = null;
+  reviewSelectedHelped = null;
+  const moment = reviewQueue[reviewIdx];
+  document.getElementById("reviewMomentLabel").textContent = `The moment at ${nowLabelFor(moment.timestamp)} (${tagLabel(moment.tag)})`;
+  document.querySelectorAll("#triedChips .chip, #helpedChips .chip").forEach((chip) => chip.classList.remove("selected"));
+  document.getElementById("helpedField").style.display = "none";
+  document.getElementById("reviewOverlay").classList.add("open");
+}
+
+document.querySelectorAll("#triedChips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("#triedChips .chip").forEach((item) => item.classList.remove("selected"));
+    chip.classList.add("selected");
+    reviewSelectedTried = chip.dataset.val;
+    reviewSelectedHelped = null;
+    document.querySelectorAll("#helpedChips .chip").forEach((item) => item.classList.remove("selected"));
+    document.getElementById("helpedField").style.display = reviewSelectedTried === "nothing" ? "none" : "block";
+  });
+});
+
+document.querySelectorAll("#helpedChips .chip").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    document.querySelectorAll("#helpedChips .chip").forEach((item) => item.classList.remove("selected"));
+    chip.classList.add("selected");
+    reviewSelectedHelped = chip.dataset.val;
+  });
+});
+
+function finishReviewStep(skipped = false) {
+  const moment = reviewQueue[reviewIdx];
+  if (skipped || !reviewSelectedTried) {
+    moment.supportTried = "skipped";
+    moment.supportHelped = null;
+  } else {
+    moment.supportTried = reviewSelectedTried;
+    moment.supportHelped = reviewSelectedTried === "nothing" ? null : reviewSelectedHelped;
+  }
+  saveData();
+  reviewIdx += 1;
+  showReviewStep();
+}
+
+document.getElementById("reviewSkip").addEventListener("click", () => finishReviewStep(true));
+document.getElementById("reviewNext").addEventListener("click", () => finishReviewStep(false));
 
 // ============================================================
 // TODAY STATUS PILLS
@@ -498,22 +578,42 @@ function renderLog() {
 }
 
 function tagLabel(tag) {
-  const map = { tired: "Tired", hungry: "Hungry", transition: "Transition", overwhelmed: "Overwhelm", sensory: "Sensory", unknown: "Not sure" };
+  const map = {
+    tired: "Tired", hungry: "Hungry", transition: "Transition",
+    limit_set: "Told no / limits", overwhelmed: "Too much going on",
+    social: "Sibling / social", sensory: "Sensory", unknown: "Not sure",
+  };
   return tag ? map[tag] || tag : "no tag added";
 }
 function recoveryLabel(r) {
   const map = { quick: "recovered quickly", slow: "took longer to settle", unsure: "recovery unclear" };
   return r ? map[r] : null;
 }
+function triedLabel(value) {
+  const map = {
+    movement: "Movement / outside", snack: "Snack", quiet_space: "Quiet space",
+    connection: "Cuddle / connection", something_else: "Something else", nothing: "Nothing tried",
+  };
+  return value ? map[value] || value : null;
+}
+function helpedLabel(value) {
+  const map = {
+    yes_clearly: "helped clearly", a_little: "helped a little",
+    not_really: "didn't really help", not_sure: "unclear if it helped",
+  };
+  return value ? map[value] || value : null;
+}
 
 function momentNode(m) {
   const div = document.createElement("div");
   div.className = "log-entry";
   const rec = recoveryLabel(m.recovery);
+  const tried = m.supportTried && m.supportTried !== "skipped" ? triedLabel(m.supportTried) : null;
+  const helped = tried && m.supportTried !== "nothing" ? helpedLabel(m.supportHelped) : null;
   div.innerHTML = `
     <div class="lt">${new Date(m.timestamp).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div>
     <div class="ld">Rough moment</div>
-    <div class="tagline">${tagLabel(m.tag)}${rec ? " · " + rec : ""}${m.note ? `<div class="moment-note">${escapeHtml(m.note)}</div>` : ""}</div>
+    <div class="tagline">${tagLabel(m.tag)}${rec ? " · " + rec : ""}${tried ? `<div class="moment-note">Tried: ${escapeHtml(tried)}${helped ? ` · ${escapeHtml(helped)}` : ""}</div>` : ""}${m.note ? `<div class="moment-note">${escapeHtml(m.note)}</div>` : ""}</div>
     <button class="entry-remove" type="button">Remove</button>
   `;
   div.querySelector(".entry-remove").addEventListener("click", () => {
@@ -624,19 +724,29 @@ function buildDayRecords() {
 }
 
 // ============================================================
-// STATS ENGINE — deterministic, evidence-gated
-// (MVP simplification: no recency decay or holdout split yet —
-//  see README "Next steps for the stats engine".)
+// STATS ENGINE — deterministic, evidence-gated, with a recent-data
+// holdout so an old pattern cannot remain "strong" indefinitely.
 // ============================================================
 function computePatterns() {
-  const days = buildDayRecords();
+  const days = buildDayRecords().sort((a, b) => a.date.localeCompare(b.date));
   const factorKeys = new Set();
   days.forEach((d) => Object.keys(d.factors).forEach((k) => factorKeys.add(k)));
+
+  const splitIdx = Math.floor(days.length * 0.7);
+  const canHoldout = days.length >= 10;
+  const trainDays = canHoldout ? days.slice(0, splitIdx) : days;
+  const testDays = canHoldout ? days.slice(splitIdx) : [];
+
+  function rateFor(dayset, key, value) {
+    const rows = dayset.filter((day) => day.factors[key] === value);
+    if (!rows.length) return null;
+    return { n: rows.length, rate: rows.filter((day) => day.moments > 0).length / rows.length };
+  }
 
   const results = [];
   factorKeys.forEach((key) => {
     const groups = {};
-    days.forEach((d) => {
+    trainDays.forEach((d) => {
       const val = d.factors[key];
       if (val === undefined) return;
       if (!groups[val]) groups[val] = { n: 0, moments: 0 };
@@ -664,12 +774,81 @@ function computePatterns() {
         let confidence = "weak_early_signal";
         if (Math.min(nHigher, nLower) >= 10 && diff >= 0.3) confidence = "strong_pattern";
         else if (Math.min(nHigher, nLower) >= MIN_N) confidence = "emerging_pattern";
-        results.push({ factor: key, higherVal, lowerVal, higherRate, lowerRate, nHigher, nLower, diff, confidence });
+        let holdoutStatus = "untested";
+        if (canHoldout) {
+          const testHigher = rateFor(testDays, key, higherVal);
+          const testLower = rateFor(testDays, key, lowerVal);
+          if (testHigher && testLower && testHigher.n >= 2 && testLower.n >= 2) {
+            holdoutStatus = testHigher.rate >= testLower.rate ? "confirmed" : "mixed_signal";
+            if (holdoutStatus === "mixed_signal" && confidence === "strong_pattern") confidence = "emerging_pattern";
+            else if (holdoutStatus === "mixed_signal" && confidence === "emerging_pattern") confidence = "weak_early_signal";
+          }
+        }
+        results.push({ factor: key, higherVal, lowerVal, higherRate, lowerRate, nHigher, nLower, diff, confidence, holdoutStatus });
       }
     }
   });
   results.sort((a, b) => b.diff - a.diff);
   return { results, totalDays: days.length };
+}
+
+function computeSupportEffectiveness() {
+  const weights = { yes_clearly: 1, a_little: 0.5, not_really: 0 };
+  const groups = {};
+  state.moments.forEach((moment) => {
+    if (!moment.supportTried || ["nothing", "skipped"].includes(moment.supportTried)) return;
+    if (!groups[moment.supportTried]) groups[moment.supportTried] = { n: 0, scored: 0, sum: 0 };
+    const group = groups[moment.supportTried];
+    group.n += 1;
+    if (moment.supportHelped && moment.supportHelped !== "not_sure") {
+      group.scored += 1;
+      group.sum += weights[moment.supportHelped] ?? 0;
+    }
+  });
+  return Object.entries(groups)
+    .map(([support, group]) => ({
+      support,
+      n: group.n,
+      avgHelp: group.scored ? group.sum / group.scored : null,
+      evidenceLevel: group.n >= 6 ? "worth_trusting" : group.n >= 3 ? "early_signal" : "just_starting",
+    }))
+    .filter((result) => result.avgHelp != null)
+    .sort((a, b) => b.avgHelp - a.avgHelp);
+}
+
+function computeContextInsight() {
+  const moments = state.moments.filter((moment) => moment.tag && moment.tag !== "unknown" && moment.recovery && moment.recovery !== "unsure");
+  if (!moments.length) return null;
+  const overallSlowRate = moments.filter((moment) => moment.recovery === "slow").length / moments.length;
+  const groups = {};
+  moments.forEach((moment) => {
+    if (!groups[moment.tag]) groups[moment.tag] = { n: 0, slow: 0 };
+    groups[moment.tag].n += 1;
+    if (moment.recovery === "slow") groups[moment.tag].slow += 1;
+  });
+  const results = Object.entries(groups)
+    .filter(([, group]) => group.n >= MIN_N)
+    .map(([tag, group]) => ({ tag, n: group.n, slowRate: group.slow / group.n, diff: group.slow / group.n - overallSlowRate }))
+    .filter((result) => Math.abs(result.diff) >= 0.15)
+    .sort((a, b) => b.diff - a.diff);
+  return results[0] || null;
+}
+
+function computeLoggingConsistency() {
+  const dates = new Set();
+  state.moments.forEach((moment) => dates.add(localDateStr(moment.timestamp)));
+  state.mornings.forEach((morning) => dates.add(morning.date));
+  state.evenings.forEach((evening) => dates.add(evening.date));
+  if (!dates.size) return null;
+  const sorted = [...dates].sort();
+  const spanDays = Math.round((new Date(sorted.at(-1)) - new Date(sorted[0])) / 86400000) + 1;
+  const morningDays = new Set(state.mornings.map((item) => item.date)).size;
+  const eveningDays = new Set(state.evenings.map((item) => item.date)).size;
+  return {
+    spanDays,
+    morningRate: Math.round((morningDays / spanDays) * 100),
+    eveningRate: Math.round((eveningDays / spanDays) * 100),
+  };
 }
 
 const FACTOR_LABELS = {
@@ -691,62 +870,75 @@ const VALUE_LABELS = {
   under15: "under 15 min", "15to45": "15–45 min", over45: "over 45 min",
   some: "some", alot: "a lot",
 };
+const EXPERIMENTS = {
+  sleep_duration: "Aim for a slightly earlier bedtime and see whether tomorrow feels different.",
+  night_wakings: "Keep tracking this; if frequent wakings persist, consider discussing them with a pediatrician.",
+  outdoor_time: "Try getting outside before the day's usual harder window.",
+  focused_time: "Try 15 minutes of uninterrupted, phone-down time together before the usual rough patch.",
+  screen_time: "Try trimming screen time earlier in the day and see whether the evening shifts.",
+  snack_present: "Try a comparable day with a different snack routine and watch what changes.",
+  structured_activity: "Try one structured activity earlier in the day.",
+  all_meals_eaten: "Try making sure all three meals happen, even if they're small, and watch what changes.",
+};
+const CONFIDENCE_DISPLAY = { weak_early_signal: "weak early signal", emerging_pattern: "emerging pattern", strong_pattern: "strong pattern" };
+const EVIDENCE_DISPLAY = { just_starting: "just starting", early_signal: "early signal", worth_trusting: "worth trusting" };
+
 function renderUnderstanding() {
   const zone = document.getElementById("understandZone");
   const { results, totalDays } = computePatterns();
+  const supportResults = computeSupportEffectiveness();
+  const contextInsight = computeContextInsight();
+  const consistency = computeLoggingConsistency();
+  let html = "";
 
   if (totalDays < 7) {
-    zone.innerHTML = `
+    html += `
       <div class="card theory-card">
         <span class="confidence-tag">still learning</span>
         <div class="theory-line">Attune needs a couple weeks of logging before it can say anything trustworthy — right now there's ${totalDays} day${totalDays === 1 ? "" : "s"} of data. Guessing early would just be noise dressed up as insight.</div>
         <div class="evidence-line">Keep tapping "Rough Moment" when it happens, and fill in the two daily check-ins — that's genuinely the whole job for now.</div>
       </div>
     `;
-    return;
-  }
-
-  if (results.length === 0) {
-    zone.innerHTML = `
+  } else if (results.length === 0) {
+    html += `
       <div class="card theory-card">
         <span class="confidence-tag">still learning</span>
         <div class="theory-line">${totalDays} days logged, and nothing has separated itself clearly yet from day-to-day noise. That's a fine, honest place to be.</div>
         <div class="evidence-line">Keep going — real patterns need enough days on both sides of a comparison (at least ${MIN_N} each) before Attune will say anything.</div>
       </div>
     `;
-    return;
+  } else {
+    const top = results[0];
+    const holdoutNote = top.holdoutStatus === "mixed_signal"
+      ? " This did not hold as clearly in the most recent days, so confidence was reduced."
+      : top.holdoutStatus === "confirmed" ? " It also held in the most recent days." : "";
+    html += `
+      <div class="card theory-card">
+        <span class="confidence-tag">${CONFIDENCE_DISPLAY[top.confidence]}</span>
+        <div class="theory-line">Rough moments show up more with <strong>${VALUE_LABELS[top.higherVal] || top.higherVal}</strong> ${FACTOR_LABELS[top.factor] || top.factor}, compared with <strong>${VALUE_LABELS[top.lowerVal] || top.lowerVal}</strong>.</div>
+        <div class="evidence-line">${Math.round(top.higherRate * 100)}% of ${top.nHigher} days vs. ${Math.round(top.lowerRate * 100)}% of ${top.nLower} days.${holdoutNote}</div>
+        <div class="try-box"><span class="lbl">Worth trying</span>${EXPERIMENTS[top.factor] || "Change one thing for a few comparable days and see what shifts."}</div>
+        <div class="try-box"><span class="lbl">How you'll know</span>Fewer rough moments on comparable days. Attune will keep tracking both outcomes.</div>
+      </div>
+      ${results.length > 1 ? `<div class="section-title">Other early signals (${results.length - 1})</div>` : ""}
+      ${results.slice(1, 4).map((result) => `<div class="card"><span class="eyebrow">${CONFIDENCE_DISPLAY[result.confidence]}</span><div style="font-size:0.88rem; color:var(--text-muted);">${FACTOR_LABELS[result.factor] || result.factor}: ${VALUE_LABELS[result.higherVal] || result.higherVal} vs ${VALUE_LABELS[result.lowerVal] || result.lowerVal} (${result.nHigher}/${result.nLower} days)</div></div>`).join("")}
+    `;
   }
 
-  const top = results[0];
-  const factorLabel = FACTOR_LABELS[top.factor] || top.factor;
-  const higherLabel = VALUE_LABELS[top.higherVal] || top.higherVal;
-  const lowerLabel = VALUE_LABELS[top.lowerVal] || top.lowerVal;
-  const pctHigher = Math.round(top.higherRate * 100);
-  const pctLower = Math.round(top.lowerRate * 100);
-  const confidenceDisplay = { weak_early_signal: "weak early signal", emerging_pattern: "emerging pattern", strong_pattern: "strong pattern" }[top.confidence];
+  if (consistency && consistency.spanDays >= 5 && (consistency.morningRate < 70 || consistency.eveningRate < 70)) {
+    html += `<div class="card" style="border-color:var(--amber-dim);"><span class="eyebrow">Logging consistency</span><div style="font-size:0.85rem; color:var(--text-muted);">Morning check-ins are present on ${consistency.morningRate}% of days and evening check-ins on ${consistency.eveningRate}%. Thin logging can keep patterns uncertain.</div></div>`;
+  }
 
-  zone.innerHTML = `
-    <div class="card theory-card">
-      <span class="confidence-tag">${confidenceDisplay}</span>
-      <div class="theory-line">Rough moments have shown up more when <strong>${factorLabel}</strong> was <strong>${higherLabel}</strong>, compared with <strong>${lowerLabel}</strong>.</div>
-      <div class="evidence-line">${pctHigher}% of ${top.nHigher} days like that had a rough moment, vs. ${pctLower}% of ${top.nLower} days on the other side. ${top.confidence === "weak_early_signal" ? "Early days — worth watching, not acting on hard yet." : ""}</div>
-      <div class="try-box">
-        <span class="lbl">Worth trying</span>
-        Over the next few comparable days, notice what happens when ${factorLabel} is ${lowerLabel} versus ${higherLabel}. Keep the rest of the routine similar when practical—no need to force a change.
-      </div>
-      <div class="try-box">
-        <span class="lbl">How you'll know</span>
-        The difference shows up again across several days, rather than disappearing with the next observation. Attune will keep counting both outcomes.
-      </div>
-    </div>
-    ${results.length > 1 ? `<div class="section-title">Other early signals (${results.length - 1})</div>` : ""}
-    ${results.slice(1, 4).map((r) => `
-      <div class="card">
-        <span class="eyebrow">${{ weak_early_signal: "weak early signal", emerging_pattern: "emerging pattern", strong_pattern: "strong pattern" }[r.confidence]}</span>
-        <div style="font-size:0.88rem; color:var(--text-muted);">${FACTOR_LABELS[r.factor] || r.factor}: ${VALUE_LABELS[r.higherVal] || r.higherVal} vs ${VALUE_LABELS[r.lowerVal] || r.lowerVal} (${r.nHigher}/${r.nLower} days)</div>
-      </div>
-    `).join("")}
-  `;
+  html += `<div class="section-title">What's helped when it's hard</div>`;
+  html += supportResults.length
+    ? supportResults.slice(0, 4).map((result) => `<div class="card"><span class="eyebrow">${EVIDENCE_DISPLAY[result.evidenceLevel]} · ${result.n} time${result.n === 1 ? "" : "s"} tried</span><h3 style="font-size:0.95rem;">${triedLabel(result.support)}</h3><div style="font-size:0.85rem; color:var(--text-muted);">${result.evidenceLevel === "just_starting" ? "Too early to trust yet—keep observing." : `Rated fully or partly helpful ${Math.round(result.avgHelp * 100)}% of scored uses.`}</div></div>`).join("")
+    : `<div class="card"><div style="font-size:0.85rem; color:var(--text-muted);">No supports scored yet. Use “Look back” after recent moments to build this evidence separately from day-level patterns.</div></div>`;
+
+  if (contextInsight) {
+    html += `<div class="section-title">Recovery pattern</div><div class="card"><span class="eyebrow">emerging pattern · ${contextInsight.n} moments</span><div style="font-size:0.9rem;">Moments tagged <strong>${tagLabel(contextInsight.tag)}</strong> took longer to settle about ${Math.round(contextInsight.slowRate * 100)}% of the time.</div></div>`;
+  }
+
+  zone.innerHTML = html;
 }
 
 // ============================================================
