@@ -9,6 +9,8 @@
    ============================================================ */
 
 const STORE_KEY = "attune_mvp_v1";
+const DEMO_BACKUP_KEY = "attune_mvp_demo_backup";
+const DEMO_STAGE_KEY = "attune_mvp_demo_stage";
 const MIN_N = 5; // hard floor: never surface a pattern with fewer than this many days of evidence per side
 
 function loadData() {
@@ -39,6 +41,7 @@ function saveData() {
 }
 
 let state = loadData();
+let simulationMode = localStorage.getItem(DEMO_BACKUP_KEY) !== null;
 let cloudClient = null;
 let cloudUser = null;
 let cloudSaveTimer = null;
@@ -53,7 +56,7 @@ function setCloudStatus(label, signedIn = false) {
 }
 
 function queueCloudSave() {
-  if (!cloudClient || !cloudUser || applyingCloudState) return;
+  if (!cloudClient || !cloudUser || applyingCloudState || simulationMode) return;
   clearTimeout(cloudSaveTimer);
   cloudSaveTimer = setTimeout(saveCloudState, 350);
 }
@@ -164,6 +167,120 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+// ============================================================
+// PARENT SIMULATION — deterministic synthetic data only.
+// Real device data is backed up and cloud writes pause until restored.
+// ============================================================
+function seededRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value = (value * 1664525 + 1013904223) >>> 0;
+    return value / 4294967296;
+  };
+}
+
+function generateParentSimulation(dayCount) {
+  const random = seededRandom(48271);
+  const moments = [];
+  const mornings = [];
+  const evenings = [];
+  const sickDays = [];
+  const start = new Date();
+  start.setHours(12, 0, 0, 0);
+  start.setDate(start.getDate() - dayCount + 1);
+  let supportIndex = 0;
+
+  for (let dayIndex = 0; dayIndex < dayCount; dayIndex += 1) {
+    const date = new Date(start);
+    date.setDate(start.getDate() + dayIndex);
+    const dateStr = localDateStr(date);
+    const shortSleep = dayIndex % 2 === 0;
+    const recentWindow = dayCount === 32 && dayIndex >= 22;
+
+    mornings.push({
+      id: `demo-m-${dayIndex}`,
+      date: dateStr,
+      bedtime: shortSleep ? "21:35" : "20:20",
+      wakeTime: shortSleep ? "06:25" : "07:15",
+      nightWakings: 0,
+      fellAsleepAlone: "yes",
+      loggedAt: new Date(date.getTime() + 8 * 3600000).toISOString(),
+    });
+
+    const note = dayIndex % 6 === 0
+      ? "Busy transition after school; connection before dinner seemed to settle things."
+      : dayIndex % 9 === 0 ? "A quieter day than expected." : "";
+    evenings.push({
+      id: `demo-e-${dayIndex}`,
+      date: dateStr,
+      meals: ["breakfast", "lunch", "dinner"],
+      snackPresent: "no",
+      outdoorTime: "30to60",
+      structuredActivity: "no",
+      focusedTime: "15to45",
+      screenTime: "some",
+      note,
+      loggedAt: new Date(date.getTime() + 20 * 3600000).toISOString(),
+    });
+
+    // Early data has a genuine short-sleep signal. In the final ten days the
+    // outcomes even out, allowing the holdout to challenge the old pattern.
+    const roughDay = recentWindow
+      ? (shortSleep ? dayIndex % 4 === 0 : dayIndex % 4 !== 0)
+      : shortSleep ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
+    if (!roughDay) continue;
+
+    const timestamp = new Date(date);
+    timestamp.setHours(16 + (dayIndex % 3), Math.floor(random() * 50), 0, 0);
+    const tag = supportIndex % 3 === 0 ? "transition" : supportIndex % 3 === 1 ? "social" : "tired";
+    const supportTried = supportIndex % 3 === 0 ? "movement" : supportIndex % 3 === 1 ? "connection" : "snack";
+    const supportHelped = supportTried === "movement"
+      ? (supportIndex % 5 === 0 ? "a_little" : "yes_clearly")
+      : supportTried === "connection" ? "a_little" : (supportIndex % 2 ? "not_really" : "not_sure");
+    moments.push({
+      id: `demo-r-${dayIndex}`,
+      timestamp: timestamp.toISOString(),
+      tag,
+      recovery: tag === "transition" ? "slow" : "quick",
+      note: "",
+      supportTried,
+      supportHelped,
+    });
+    supportIndex += 1;
+  }
+
+  return { moments, mornings, evenings, sickDays };
+}
+
+function startSimulation() {
+  if (!simulationMode) {
+    localStorage.setItem(DEMO_BACKUP_KEY, JSON.stringify(state));
+    simulationMode = true;
+  }
+  setSimulationStage(7);
+}
+
+function setSimulationStage(dayCount) {
+  localStorage.setItem(DEMO_STAGE_KEY, String(dayCount));
+  state = generateParentSimulation(dayCount);
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  renderTodayStatus();
+  renderUnderstanding();
+  showToast(`Simulation: ${dayCount} days of parent input.`);
+}
+
+function restoreRealData() {
+  const backup = localStorage.getItem(DEMO_BACKUP_KEY);
+  state = backup ? JSON.parse(backup) : { moments: [], mornings: [], evenings: [], sickDays: [] };
+  localStorage.setItem(STORE_KEY, JSON.stringify(state));
+  localStorage.removeItem(DEMO_BACKUP_KEY);
+  localStorage.removeItem(DEMO_STAGE_KEY);
+  simulationMode = false;
+  renderTodayStatus();
+  renderUnderstanding();
+  showToast("Real entries restored.");
 }
 
 // ============================================================
@@ -778,7 +895,9 @@ function computePatterns() {
         if (canHoldout) {
           const testHigher = rateFor(testDays, key, higherVal);
           const testLower = rateFor(testDays, key, lowerVal);
-          if (testHigher && testLower && testHigher.n >= 2 && testLower.n >= 2) {
+          // The holdout uses the same evidence floor as the training comparison.
+          // Calling 2–3 observations per side "confirmed" was still mostly noise.
+          if (testHigher && testLower && testHigher.n >= MIN_N && testLower.n >= MIN_N) {
             holdoutStatus = testHigher.rate >= testLower.rate ? "confirmed" : "mixed_signal";
             if (holdoutStatus === "mixed_signal" && confidence === "strong_pattern") confidence = "emerging_pattern";
             else if (holdoutStatus === "mixed_signal" && confidence === "emerging_pattern") confidence = "weak_early_signal";
@@ -830,8 +949,8 @@ function computeContextInsight() {
     .filter(([, group]) => group.n >= MIN_N)
     .map(([tag, group]) => ({ tag, n: group.n, slowRate: group.slow / group.n, diff: group.slow / group.n - overallSlowRate }))
     .filter((result) => Math.abs(result.diff) >= 0.15)
-    .sort((a, b) => b.diff - a.diff);
-  return results[0] || null;
+    .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+  return results.length ? { ...results[0], overallSlowRate } : null;
 }
 
 function computeLoggingConsistency() {
@@ -889,7 +1008,23 @@ function renderUnderstanding() {
   const supportResults = computeSupportEffectiveness();
   const contextInsight = computeContextInsight();
   const consistency = computeLoggingConsistency();
-  let html = "";
+  const simulationStage = Number(localStorage.getItem(DEMO_STAGE_KEY)) || 0;
+  let html = simulationMode
+    ? `<div class="card" style="border-color:var(--teal-accent);">
+        <span class="eyebrow">Parent simulation · synthetic data</span>
+        <h3>${simulationStage} days observed</h3>
+        <p class="desc">Cloud sync is paused. Step forward to watch the evidence change; your real entries are safely backed up on this device.</p>
+        <div class="chip-row" id="simulationStages">
+          ${[7, 14, 21, 32].map((days) => `<button class="chip${days === simulationStage ? " selected" : ""}" type="button" data-sim-days="${days}">${days} days</button>`).join("")}
+        </div>
+        <button class="btn ghost" id="restoreSimulation" type="button" style="margin-top:12px;">Exit simulation &amp; restore my data</button>
+      </div>`
+    : `<div class="card" style="border-color:var(--line);">
+        <span class="eyebrow">Explore how Attune learns</span>
+        <h3>Run a parent-input simulation</h3>
+        <p class="desc">Use realistic synthetic entries to watch the outputs develop over 7, 14, 21, and 32 days. Your current data will be backed up first.</p>
+        <button class="btn ghost" id="startSimulation" type="button">Start simulation</button>
+      </div>`;
 
   if (totalDays < 7) {
     html += `
@@ -935,10 +1070,23 @@ function renderUnderstanding() {
     : `<div class="card"><div style="font-size:0.85rem; color:var(--text-muted);">No supports scored yet. Use “Look back” after recent moments to build this evidence separately from day-level patterns.</div></div>`;
 
   if (contextInsight) {
-    html += `<div class="section-title">Recovery pattern</div><div class="card"><span class="eyebrow">emerging pattern · ${contextInsight.n} moments</span><div style="font-size:0.9rem;">Moments tagged <strong>${tagLabel(contextInsight.tag)}</strong> took longer to settle about ${Math.round(contextInsight.slowRate * 100)}% of the time.</div></div>`;
+    const slowPct = Math.round(contextInsight.slowRate * 100);
+    const overallPct = Math.round(contextInsight.overallSlowRate * 100);
+    const recoveryCopy = contextInsight.diff > 0
+      ? `took longer to settle more often than moments overall—${slowPct}% of the time, versus ${overallPct}% overall.`
+      : `tended to bounce back faster than moments overall—a slow recovery ${slowPct}% of the time, versus ${overallPct}% overall.`;
+    html += `<div class="section-title">Recovery pattern</div><div class="card"><span class="eyebrow">emerging pattern · ${contextInsight.n} moments</span><div style="font-size:0.9rem;">Moments tagged <strong>${tagLabel(contextInsight.tag)}</strong> ${recoveryCopy}</div></div>`;
   }
 
   zone.innerHTML = html;
+
+  const startButton = document.getElementById("startSimulation");
+  if (startButton) startButton.addEventListener("click", startSimulation);
+  const restoreButton = document.getElementById("restoreSimulation");
+  if (restoreButton) restoreButton.addEventListener("click", restoreRealData);
+  document.querySelectorAll("[data-sim-days]").forEach((button) => {
+    button.addEventListener("click", () => setSimulationStage(Number(button.dataset.simDays)));
+  });
 }
 
 // ============================================================

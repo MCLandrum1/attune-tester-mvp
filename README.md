@@ -21,11 +21,16 @@ The app is local-first: every action saves immediately in the browser. When depl
   - Uses the most recent third of the data as a lightweight holdout after 10+ days, downgrading findings that do not continue in the recent slice.
   - Separately summarizes support effectiveness, recovery patterns by context, and logging consistency.
   - Always shows one working explanation, one small thing to try, and one observable sign of whether it worked — never a wall of charts.
+- **Parent simulation** — a built-in synthetic family story that can be advanced through 7, 14, 21, and 32 days. It demonstrates evidence thresholds, support effectiveness, recovery context, and a pattern being downgraded when the recent holdout reverses. Real device data is backed up and cloud writes pause until the simulation is exited.
 - **Export** — one button downloads all logged data as JSON, so testers aren't locked in and you can pull real data out to analyze centrally.
 
 ## Hosting
 
 The tester is deployed on Vercel. `/api/config` exposes only the Supabase URL and publishable client key; authentication and Row Level Security protect each user's cloud state.
+
+## Testing the learning loop
+
+Open **Understanding → Start simulation**. At 7 days Attune should remain cautious. At 14 and 21 days evidence begins to shape the output. At 32 days the deliberately reversed recent sleep data should prevent the older relationship from being treated as freshly confirmed. Support-effectiveness and recovery-context cards develop independently. Exiting restores the parent's original device data.
 
 ## Known limitations (by design, for a fast test — not oversights)
 
