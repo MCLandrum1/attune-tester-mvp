@@ -11,6 +11,7 @@
 const STORE_KEY = "attune_mvp_v1";
 const DEMO_BACKUP_KEY = "attune_mvp_demo_backup";
 const DEMO_STAGE_KEY = "attune_mvp_demo_stage";
+const DEMO_SCENARIO_KEY = "attune_mvp_demo_scenario";
 const MIN_N = 5; // hard floor: never surface a pattern with fewer than this many days of evidence per side
 
 function loadData() {
@@ -181,8 +182,17 @@ function seededRandom(seed) {
   };
 }
 
-function generateParentSimulation(dayCount) {
-  const random = seededRandom(48271);
+const SIMULATION_SCENARIOS = {
+  changing: { label: "Changing pattern", description: "A real sleep signal weakens and reverses in recent days." },
+  messy: { label: "Messy logging", description: "Missed check-ins, unsure answers, multiple moments, and skipped reviews." },
+  noise: { label: "No true pattern", description: "Plenty of entries, but outcomes are intentionally unrelated to daily factors." },
+  illness: { label: "Illness-heavy", description: "Many sick days test whether health context stays visible but out of comparisons." },
+  supports: { label: "Mixed supports", description: "Frequent moments build strong, weak, and contradictory support histories." },
+};
+
+function generateParentSimulation(dayCount, scenario = "changing") {
+  const seedOffset = Object.keys(SIMULATION_SCENARIOS).indexOf(scenario) * 7919;
+  const random = seededRandom(48271 + Math.max(0, seedOffset));
   const moments = [];
   const mornings = [];
   const evenings = [];
@@ -199,7 +209,9 @@ function generateParentSimulation(dayCount) {
     const shortSleep = dayIndex % 2 === 0;
     const recentWindow = dayCount === 32 && dayIndex >= 22;
 
-    mornings.push({
+    const skipMorning = scenario === "messy" && dayIndex % 4 === 0;
+    const skipEvening = scenario === "messy" && dayIndex % 5 === 0;
+    if (!skipMorning) mornings.push({
       id: `demo-m-${dayIndex}`,
       date: dateStr,
       bedtime: shortSleep ? "21:35" : "20:20",
@@ -212,12 +224,12 @@ function generateParentSimulation(dayCount) {
     const note = dayIndex % 6 === 0
       ? "Busy transition after school; connection before dinner seemed to settle things."
       : dayIndex % 9 === 0 ? "A quieter day than expected." : "";
-    evenings.push({
+    if (!skipEvening) evenings.push({
       id: `demo-e-${dayIndex}`,
       date: dateStr,
-      meals: ["breakfast", "lunch", "dinner"],
-      snackPresent: "no",
-      outdoorTime: "30to60",
+      meals: scenario === "messy" && dayIndex % 3 === 0 ? ["breakfast", "dinner"] : ["breakfast", "lunch", "dinner"],
+      snackPresent: scenario === "messy" && dayIndex % 6 === 0 ? "unsure" : "no",
+      outdoorTime: scenario === "messy" && dayIndex % 4 === 1 ? "unsure" : "30to60",
       structuredActivity: "no",
       focusedTime: "15to45",
       screenTime: "some",
@@ -227,18 +239,28 @@ function generateParentSimulation(dayCount) {
 
     // Early data has a genuine short-sleep signal. In the final ten days the
     // outcomes even out, allowing the holdout to challenge the old pattern.
-    const roughDay = recentWindow
-      ? (shortSleep ? dayIndex % 4 === 0 : dayIndex % 4 !== 0)
-      : shortSleep ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
+    if (scenario === "illness" && dayIndex % 3 === 0) {
+      sickDays.push({ id: `demo-s-${dayIndex}`, date: dateStr, loggedAt: new Date(date.getTime() + 9 * 3600000).toISOString() });
+    }
+
+    let roughDay;
+    if (scenario === "noise") roughDay = (dayIndex * 7 + 3) % 10 < 4;
+    else if (scenario === "supports") roughDay = dayIndex % 5 !== 0;
+    else if (scenario === "messy") roughDay = shortSleep ? dayIndex % 5 !== 0 : dayIndex % 7 === 1;
+    else if (recentWindow) roughDay = shortSleep ? dayIndex % 4 === 0 : dayIndex % 4 !== 0;
+    else roughDay = shortSleep ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
     if (!roughDay) continue;
 
     const timestamp = new Date(date);
     timestamp.setHours(16 + (dayIndex % 3), Math.floor(random() * 50), 0, 0);
     const tag = supportIndex % 3 === 0 ? "transition" : supportIndex % 3 === 1 ? "social" : "tired";
-    const supportTried = supportIndex % 3 === 0 ? "movement" : supportIndex % 3 === 1 ? "connection" : "snack";
+    const supportTried = scenario === "messy" && supportIndex % 5 === 0
+      ? "skipped"
+      : supportIndex % 3 === 0 ? "movement" : supportIndex % 3 === 1 ? "connection" : "snack";
     const supportHelped = supportTried === "movement"
       ? (supportIndex % 5 === 0 ? "a_little" : "yes_clearly")
-      : supportTried === "connection" ? "a_little" : (supportIndex % 2 ? "not_really" : "not_sure");
+      : supportTried === "connection" ? (scenario === "supports" && supportIndex % 4 === 0 ? "not_really" : "a_little")
+        : supportTried === "skipped" ? null : (supportIndex % 2 ? "not_really" : "not_sure");
     moments.push({
       id: `demo-r-${dayIndex}`,
       timestamp: timestamp.toISOString(),
@@ -249,6 +271,20 @@ function generateParentSimulation(dayCount) {
       supportHelped,
     });
     supportIndex += 1;
+
+    if ((scenario === "messy" || scenario === "supports") && dayIndex % 3 === 0) {
+      const secondTimestamp = new Date(timestamp.getTime() + 75 * 60000);
+      moments.push({
+        id: `demo-r2-${dayIndex}`,
+        timestamp: secondTimestamp.toISOString(),
+        tag: scenario === "messy" && dayIndex % 6 === 0 ? "unknown" : "overwhelmed",
+        recovery: scenario === "messy" && dayIndex % 4 === 0 ? "unsure" : "quick",
+        note: "Second hard moment during a crowded part of the day.",
+        supportTried: supportIndex % 2 === 0 ? "quiet_space" : "movement",
+        supportHelped: supportIndex % 2 === 0 ? "not_really" : "yes_clearly",
+      });
+      supportIndex += 1;
+    }
   }
 
   return { moments, mornings, evenings, sickDays };
@@ -264,11 +300,18 @@ function startSimulation() {
 
 function setSimulationStage(dayCount) {
   localStorage.setItem(DEMO_STAGE_KEY, String(dayCount));
-  state = generateParentSimulation(dayCount);
+  const scenario = localStorage.getItem(DEMO_SCENARIO_KEY) || "changing";
+  state = generateParentSimulation(dayCount, scenario);
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   renderTodayStatus();
   renderUnderstanding();
   showToast(`Simulation: ${dayCount} days of parent input.`);
+}
+
+function setSimulationScenario(scenario) {
+  if (!SIMULATION_SCENARIOS[scenario]) return;
+  localStorage.setItem(DEMO_SCENARIO_KEY, scenario);
+  setSimulationStage(Number(localStorage.getItem(DEMO_STAGE_KEY)) || 32);
 }
 
 function restoreRealData() {
@@ -277,6 +320,7 @@ function restoreRealData() {
   localStorage.setItem(STORE_KEY, JSON.stringify(state));
   localStorage.removeItem(DEMO_BACKUP_KEY);
   localStorage.removeItem(DEMO_STAGE_KEY);
+  localStorage.removeItem(DEMO_SCENARIO_KEY);
   simulationMode = false;
   renderTodayStatus();
   renderUnderstanding();
@@ -1009,11 +1053,20 @@ function renderUnderstanding() {
   const contextInsight = computeContextInsight();
   const consistency = computeLoggingConsistency();
   const simulationStage = Number(localStorage.getItem(DEMO_STAGE_KEY)) || 0;
+  const simulationScenario = localStorage.getItem(DEMO_SCENARIO_KEY) || "changing";
+  const simulationSummary = `${state.moments.length} moments · ${state.mornings.length} mornings · ${state.evenings.length} evenings · ${state.sickDays.length} sick days`;
   let html = simulationMode
     ? `<div class="card" style="border-color:var(--teal-accent);">
         <span class="eyebrow">Parent simulation · synthetic data</span>
         <h3>${simulationStage} days observed</h3>
         <p class="desc">Cloud sync is paused. Step forward to watch the evidence change; your real entries are safely backed up on this device.</p>
+        <div class="evidence-line">${simulationSummary}</div>
+        <div class="section-title" style="margin-top:14px;">Boundary scenario</div>
+        <div class="chip-row" id="simulationScenarios">
+          ${Object.entries(SIMULATION_SCENARIOS).map(([key, item]) => `<button class="chip${key === simulationScenario ? " selected" : ""}" type="button" data-sim-scenario="${key}">${item.label}</button>`).join("")}
+        </div>
+        <p class="desc" style="margin-top:8px;">${SIMULATION_SCENARIOS[simulationScenario].description}</p>
+        <div class="section-title" style="margin-top:14px;">Observation window</div>
         <div class="chip-row" id="simulationStages">
           ${[7, 14, 21, 32].map((days) => `<button class="chip${days === simulationStage ? " selected" : ""}" type="button" data-sim-days="${days}">${days} days</button>`).join("")}
         </div>
@@ -1086,6 +1139,9 @@ function renderUnderstanding() {
   if (restoreButton) restoreButton.addEventListener("click", restoreRealData);
   document.querySelectorAll("[data-sim-days]").forEach((button) => {
     button.addEventListener("click", () => setSimulationStage(Number(button.dataset.simDays)));
+  });
+  document.querySelectorAll("[data-sim-scenario]").forEach((button) => {
+    button.addEventListener("click", () => setSimulationScenario(button.dataset.simScenario));
   });
 }
 
