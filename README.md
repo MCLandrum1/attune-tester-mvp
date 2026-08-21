@@ -20,6 +20,8 @@ The app is local-first: every action saves immediately in the browser. When depl
   - Labels findings `weak early signal` / `emerging pattern` / `strong pattern` based on sample size and effect size — never based on how confident the wording sounds.
   - Uses the most recent third of the data as a lightweight holdout after 10+ days, downgrading findings that do not continue in the recent slice.
   - Separately summarizes support effectiveness, recovery patterns by context, and logging consistency.
+  - Keeps evidence strength separate from outcome direction: for example, “worth trusting, mixed results” instead of allowing “worth trusting” to sound like an endorsement.
+  - Shows raw recovery counts alongside percentages so small samples cannot look artificially precise.
   - Always shows one working explanation, one small thing to try, and one observable sign of whether it worked — never a wall of charts.
 - **Parent simulation** — synthetic family stories that can be advanced through 7, 14, 21, and 32 days. Boundary scenarios cover a changing pattern, messy or missing logging, no true pattern, illness-heavy weeks, and mixed support outcomes. Real device data is backed up and cloud writes pause until the simulation is exited.
 - **Export** — one button downloads all logged data as JSON, so testers aren't locked in and you can pull real data out to analyze centrally.

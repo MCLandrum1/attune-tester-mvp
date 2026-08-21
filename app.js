@@ -1045,6 +1045,19 @@ const EXPERIMENTS = {
 };
 const CONFIDENCE_DISPLAY = { weak_early_signal: "weak early signal", emerging_pattern: "emerging pattern", strong_pattern: "strong pattern" };
 const EVIDENCE_DISPLAY = { just_starting: "just starting", early_signal: "early signal", worth_trusting: "worth trusting" };
+// Evidence answers "how much data?" Direction separately answers "did it help?"
+// A well-observed coin flip must never look like an endorsement.
+const DIRECTION_DISPLAY = {
+  helping_consistently: "helping consistently",
+  mixed_results: "mixed results",
+  not_helping_much: "not helping much",
+};
+function directionFor(avgHelp) {
+  if (avgHelp == null) return null;
+  if (avgHelp >= 0.65) return "helping_consistently";
+  if (avgHelp >= 0.35) return "mixed_results";
+  return "not_helping_much";
+}
 
 function renderUnderstanding() {
   const zone = document.getElementById("understandZone");
@@ -1119,15 +1132,31 @@ function renderUnderstanding() {
 
   html += `<div class="section-title">What's helped when it's hard</div>`;
   html += supportResults.length
-    ? supportResults.slice(0, 4).map((result) => `<div class="card"><span class="eyebrow">${EVIDENCE_DISPLAY[result.evidenceLevel]} · ${result.n} time${result.n === 1 ? "" : "s"} tried</span><h3 style="font-size:0.95rem;">${triedLabel(result.support)}</h3><div style="font-size:0.85rem; color:var(--text-muted);">${result.evidenceLevel === "just_starting" ? "Too early to trust yet—keep observing." : `Rated fully or partly helpful ${Math.round(result.avgHelp * 100)}% of scored uses.`}</div></div>`).join("")
+    ? supportResults.slice(0, 4).map((result) => {
+        const direction = directionFor(result.avgHelp);
+        const percentage = Math.round(result.avgHelp * 100);
+        const badge = direction
+          ? `${EVIDENCE_DISPLAY[result.evidenceLevel]}, ${DIRECTION_DISPLAY[direction]}`
+          : EVIDENCE_DISPLAY[result.evidenceLevel];
+        const body = result.evidenceLevel === "just_starting"
+          ? `Only ${result.n} time${result.n === 1 ? "" : "s"} tried so far (${percentage}% helpful)—too early to trust, worth a few more observations.`
+          : `Rated fully or partly helpful ${percentage}% of scored uses.`;
+        return `<div class="card"><span class="eyebrow">${badge} · ${result.n} time${result.n === 1 ? "" : "s"} tried</span><h3 style="font-size:0.95rem;">${triedLabel(result.support)}</h3><div style="font-size:0.85rem; color:var(--text-muted);">${body}</div></div>`;
+      }).join("")
     : `<div class="card"><div style="font-size:0.85rem; color:var(--text-muted);">No supports scored yet. Use “Look back” after recent moments to build this evidence separately from day-level patterns.</div></div>`;
 
   if (contextInsight) {
     const slowPct = Math.round(contextInsight.slowRate * 100);
     const overallPct = Math.round(contextInsight.overallSlowRate * 100);
+    const slowCount = Math.round(contextInsight.slowRate * contextInsight.n);
+    const countPhrase = slowCount === contextInsight.n
+      ? `all ${contextInsight.n} tracked moments`
+      : slowCount === 0
+        ? `none of ${contextInsight.n} tracked moments`
+        : `${slowCount} of ${contextInsight.n} tracked moments (${slowPct}%)`;
     const recoveryCopy = contextInsight.diff > 0
-      ? `took longer to settle more often than moments overall—${slowPct}% of the time, versus ${overallPct}% overall.`
-      : `tended to bounce back faster than moments overall—a slow recovery ${slowPct}% of the time, versus ${overallPct}% overall.`;
+      ? `took longer to settle more often than moments overall—${countPhrase}, versus ${overallPct}% overall.`
+      : `tended to bounce back faster than moments overall—a slow recovery in ${countPhrase}, versus ${overallPct}% overall.`;
     html += `<div class="section-title">Recovery pattern</div><div class="card"><span class="eyebrow">emerging pattern · ${contextInsight.n} moments</span><div style="font-size:0.9rem;">Moments tagged <strong>${tagLabel(contextInsight.tag)}</strong> ${recoveryCopy}</div></div>`;
   }
 
