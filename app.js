@@ -188,6 +188,10 @@ const SIMULATION_SCENARIOS = {
   noise: { label: "No true pattern", description: "Plenty of entries, but outcomes are intentionally unrelated to daily factors." },
   illness: { label: "Illness-heavy", description: "Many sick days test whether health context stays visible but out of comparisons." },
   supports: { label: "Mixed supports", description: "Frequent moments build strong, weak, and contradictory support histories." },
+  nap_signal: { label: "Nap signal", description: "No-nap days reliably carry more rough moments." },
+  setting_null: { label: "School/home null", description: "School and home days have equal outcomes, so no setting pattern should surface." },
+  routine_reversal: { label: "Routine reversal", description: "Disruption predicts rough days early, then reverses in the recent holdout." },
+  discomfort_thin: { label: "Discomfort inconclusive", description: "Clear discomfort appears too rarely to cross the evidence floor." },
 };
 
 function generateParentSimulation(dayCount, scenario = "changing") {
@@ -206,8 +210,12 @@ function generateParentSimulation(dayCount, scenario = "changing") {
     const date = new Date(start);
     date.setDate(start.getDate() + dayIndex);
     const dateStr = localDateStr(date);
-    const shortSleep = dayIndex % 2 === 0;
+    const shortSleep = ["changing", "messy", "illness"].includes(scenario) && dayIndex % 2 === 0;
     const recentWindow = dayCount === 32 && dayIndex >= 22;
+    const nap = scenario === "nap_signal" ? (dayIndex % 2 === 0 ? "none" : "45to90") : "45to90";
+    const daySetting = scenario === "setting_null" ? (dayIndex % 2 === 0 ? "school" : "home") : "mixed";
+    const routineDisruption = scenario === "routine_reversal" ? (dayIndex % 2 === 0 ? "yes" : "no") : "no";
+    const physicalDiscomfort = scenario === "discomfort_thin" && dayIndex % 11 === 0 ? "clear" : "none";
 
     const skipMorning = scenario === "messy" && dayIndex % 4 === 0;
     const skipEvening = scenario === "messy" && dayIndex % 5 === 0;
@@ -233,6 +241,10 @@ function generateParentSimulation(dayCount, scenario = "changing") {
       structuredActivity: "no",
       focusedTime: "15to45",
       screenTime: "some",
+      nap,
+      daySetting,
+      routineDisruption,
+      physicalDiscomfort,
       note,
       loggedAt: new Date(date.getTime() + 20 * 3600000).toISOString(),
     });
@@ -247,6 +259,11 @@ function generateParentSimulation(dayCount, scenario = "changing") {
     if (scenario === "noise") roughDay = (dayIndex * 7 + 3) % 10 < 4;
     else if (scenario === "supports") roughDay = dayIndex % 5 !== 0;
     else if (scenario === "messy") roughDay = shortSleep ? dayIndex % 5 !== 0 : dayIndex % 7 === 1;
+    else if (scenario === "nap_signal") roughDay = nap === "none" ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
+    else if (scenario === "setting_null") roughDay = dayIndex % 4 < 2;
+    else if (scenario === "routine_reversal" && recentWindow) roughDay = routineDisruption === "yes" ? dayIndex % 4 === 0 : dayIndex % 4 !== 0;
+    else if (scenario === "routine_reversal") roughDay = routineDisruption === "yes" ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
+    else if (scenario === "discomfort_thin") roughDay = physicalDiscomfort === "clear" || dayIndex % 5 === 2;
     else if (recentWindow) roughDay = shortSleep ? dayIndex % 4 === 0 : dayIndex % 4 !== 0;
     else roughDay = shortSleep ? dayIndex % 6 !== 0 : dayIndex % 8 === 1;
     if (!roughDay) continue;
@@ -550,6 +567,10 @@ document.getElementById("openEvening").addEventListener("click", () => {
   document.getElementById("f_outdoor").value = existing ? existing.outdoorTime : "unsure";
   document.getElementById("f_focus").value = existing ? existing.focusedTime : "unsure";
   document.getElementById("f_screen").value = existing ? existing.screenTime : "unsure";
+  document.getElementById("f_nap").value = existing ? existing.nap || "unsure" : "unsure";
+  document.getElementById("f_daySetting").value = existing ? existing.daySetting || "unsure" : "unsure";
+  document.getElementById("f_routineDisruption").value = existing ? existing.routineDisruption || "unsure" : "unsure";
+  document.getElementById("f_physicalDiscomfort").value = existing ? existing.physicalDiscomfort || "unsure" : "unsure";
   document.getElementById("f_eveningNote").value = existing ? existing.note || "" : "";
   updateMealsChips();
   updateSnackChips();
@@ -594,6 +615,10 @@ document.getElementById("eveningSave").addEventListener("click", () => {
     structuredActivity: selectedStruct,
     focusedTime: document.getElementById("f_focus").value,
     screenTime: document.getElementById("f_screen").value,
+    nap: document.getElementById("f_nap").value,
+    daySetting: document.getElementById("f_daySetting").value,
+    routineDisruption: document.getElementById("f_routineDisruption").value,
+    physicalDiscomfort: document.getElementById("f_physicalDiscomfort").value,
     note: document.getElementById("f_eveningNote").value.trim().slice(0, 1000),
     loggedAt: new Date().toISOString(),
   };
@@ -878,6 +903,10 @@ function buildDayRecords() {
     if (e.screenTime && e.screenTime !== "unsure") rec.factors["screen_time"] = e.screenTime;
     if (e.snackPresent && e.snackPresent !== "unsure") rec.factors["snack_present"] = e.snackPresent;
     if (e.structuredActivity && e.structuredActivity !== "unsure") rec.factors["structured_activity"] = e.structuredActivity;
+    if (e.nap && e.nap !== "unsure") rec.factors["nap_duration"] = e.nap;
+    if (e.daySetting && e.daySetting !== "unsure") rec.factors["day_setting"] = e.daySetting;
+    if (e.routineDisruption && e.routineDisruption !== "unsure") rec.factors["routine_disruption"] = e.routineDisruption;
+    if (e.physicalDiscomfort && e.physicalDiscomfort !== "unsure") rec.factors["physical_discomfort"] = e.physicalDiscomfort;
     if (e.meals) rec.factors["all_meals_eaten"] = e.meals.length >= 3 ? "yes" : "no";
   });
   const sickDates = new Set(state.sickDays.map((entry) => entry.date));
@@ -1024,6 +1053,10 @@ const FACTOR_LABELS = {
   snack_present: "sugary or processed snacks",
   structured_activity: "structured activity",
   all_meals_eaten: "eating all three meals",
+  nap_duration: "nap duration",
+  day_setting: "school/daycare versus home",
+  routine_disruption: "routine disruption",
+  physical_discomfort: "signs of physical discomfort",
 };
 const VALUE_LABELS = {
   short: "under 10 hours", adequate: "10+ hours",
@@ -1032,6 +1065,9 @@ const VALUE_LABELS = {
   none: "none", under30: "under 30 min", "30to60": "30–60 min", over60: "over 60 min",
   under15: "under 15 min", "15to45": "15–45 min", over45: "over 45 min",
   some: "some", alot: "a lot",
+  under45: "under 45 min", "45to90": "45â€“90 min", over90: "over 90 min",
+  school: "school/daycare", home: "home", mixed: "a mixed day",
+  possible: "possible signs", clear: "clear signs",
 };
 const EXPERIMENTS = {
   sleep_duration: "Aim for a slightly earlier bedtime and see whether tomorrow feels different.",
@@ -1042,6 +1078,10 @@ const EXPERIMENTS = {
   snack_present: "Try a comparable day with a different snack routine and watch what changes.",
   structured_activity: "Try one structured activity earlier in the day.",
   all_meals_eaten: "Try making sure all three meals happen, even if they're small, and watch what changes.",
+  nap_duration: "Keep the nap window consistent for a few comparable days and watch whether the usual hard period shifts.",
+  day_setting: "Compare similar school/daycare and home days before changing anythingâ€”the setting may be context, not a cause.",
+  routine_disruption: "On a disrupted day, preview the changed plan and add one familiar anchor to see whether transitions feel easier.",
+  physical_discomfort: "Treat discomfort as health context, not a behavior cause; address the physical need and seek medical guidance when appropriate.",
 };
 const CONFIDENCE_DISPLAY = { weak_early_signal: "weak early signal", emerging_pattern: "emerging pattern", strong_pattern: "strong pattern" };
 const EVIDENCE_DISPLAY = { just_starting: "just starting", early_signal: "early signal", worth_trusting: "worth trusting" };

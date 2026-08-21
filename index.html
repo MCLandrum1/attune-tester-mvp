@@ -498,6 +498,42 @@
       </select>
     </label>
     <label class="field">
+      <span class="flabel">Nap today</span>
+      <select id="f_nap">
+        <option value="unsure" selected>Not sure</option>
+        <option value="none">No nap</option>
+        <option value="under45">Under 45 min</option>
+        <option value="45to90">45–90 min</option>
+        <option value="over90">Over 90 min</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="flabel">Most of the day was</span>
+      <select id="f_daySetting">
+        <option value="unsure" selected>Not sure</option>
+        <option value="school">School / daycare</option>
+        <option value="home">At home</option>
+        <option value="mixed">A mix of both</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="flabel">Was the usual routine disrupted?</span>
+      <select id="f_routineDisruption">
+        <option value="unsure" selected>Not sure</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="flabel">Any signs of physical discomfort?</span>
+      <select id="f_physicalDiscomfort">
+        <option value="unsure" selected>Not sure</option>
+        <option value="none">None noticed</option>
+        <option value="possible">Possible / mild signs</option>
+        <option value="clear">Clear signs</option>
+      </select>
+    </label>
+    <label class="field">
       <span class="flabel">Optional notes — write the day however it comes out</span>
       <textarea id="f_eveningNote" maxlength="1000" placeholder="Moments you noticed, what happened, what helped…"></textarea>
     </label>
@@ -511,6 +547,6 @@
 <div class="toast" id="toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 </body>
 </html>
