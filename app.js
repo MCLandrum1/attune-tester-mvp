@@ -1065,7 +1065,7 @@ const VALUE_LABELS = {
   none: "none", under30: "under 30 min", "30to60": "30–60 min", over60: "over 60 min",
   under15: "under 15 min", "15to45": "15–45 min", over45: "over 45 min",
   some: "some", alot: "a lot",
-  under45: "under 45 min", "45to90": "45â€“90 min", over90: "over 90 min",
+  under45: "under 45 min", "45to90": "45–90 min", over90: "over 90 min",
   school: "school/daycare", home: "home", mixed: "a mixed day",
   possible: "possible signs", clear: "clear signs",
 };
@@ -1079,7 +1079,7 @@ const EXPERIMENTS = {
   structured_activity: "Try one structured activity earlier in the day.",
   all_meals_eaten: "Try making sure all three meals happen, even if they're small, and watch what changes.",
   nap_duration: "Keep the nap window consistent for a few comparable days and watch whether the usual hard period shifts.",
-  day_setting: "Compare similar school/daycare and home days before changing anythingâ€”the setting may be context, not a cause.",
+  day_setting: "Compare similar school/daycare and home days before changing anything—the setting may be context, not a cause.",
   routine_disruption: "On a disrupted day, preview the changed plan and add one familiar anchor to see whether transitions feel easier.",
   physical_discomfort: "Treat discomfort as health context, not a behavior cause; address the physical need and seek medical guidance when appropriate.",
 };
